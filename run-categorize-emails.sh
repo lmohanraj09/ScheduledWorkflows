@@ -1,20 +1,15 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="${0:A:h}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TASK_FILE="$SCRIPT_DIR/categorize-last-24h-emails.codex.md"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/categorize-emails.log"
 
-DEFAULT_CODEX_BIN="/Users/anjana/.nvm/versions/node/v24.14.1/bin/codex"
-CODEX_BIN="${CODEX_BIN:-$DEFAULT_CODEX_BIN}"
-
-if [[ ! -x "$CODEX_BIN" ]]; then
-  CODEX_BIN="$(command -v codex || true)"
-fi
+CODEX_BIN="${CODEX_BIN:-$(command -v codex || true)}"
 
 if [[ -z "$CODEX_BIN" || ! -x "$CODEX_BIN" ]]; then
-  echo "codex CLI not found. Set CODEX_BIN to the full codex path." >&2
+  echo "codex CLI not found. Install Codex or set CODEX_BIN to the full codex path." >&2
   exit 1
 fi
 
@@ -34,4 +29,4 @@ mkdir -p "$LOG_DIR"
     --ask-for-approval never \
     - < "$TASK_FILE"
   echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') finished email categorization ====="
-} >> "$LOG_FILE" 2>&1
+} 2>&1 | tee -a "$LOG_FILE"

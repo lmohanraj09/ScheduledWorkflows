@@ -1,0 +1,130 @@
+{
+  "lookback_hours": 24,
+  "gmail_query": "newer_than:1d -in:spam -in:trash -in:sent",
+  "match_fields": ["from", "subject", "snippet", "body"],
+  "categories": [
+    {
+      "name": "Likely Action Items",
+      "keywords": [
+        "action required",
+        "please review",
+        "please respond",
+        "due",
+        "deadline",
+        "meeting",
+        "appointment",
+        "statement ready",
+        "summary available",
+        "security alert",
+        "attached",
+        "agenda",
+        "invoice",
+        "payment",
+        "form 16a",
+        "tds certificate"
+      ]
+    },
+    {
+      "name": "Important Stakeholder",
+      "keywords": [
+        "stakeholder1@example.com",
+        "stakeholder2@example.com",
+        "stakeholder3@example.com"
+      ]
+    },
+    {
+      "name": "Finance",
+      "keywords": [
+        "american express",
+        "amex",
+        "chase",
+        "mortgage",
+        "bank",
+        "statement",
+        "purchase",
+        "transaction",
+        "balance",
+        "tds",
+        "tax"
+      ]
+    },
+    {
+      "name": "Calendar and Travel",
+      "keywords": [
+        "calendar",
+        "event",
+        "meeting",
+        "reservation",
+        "stay",
+        "flight",
+        "hotel",
+        "travel",
+        "trip",
+        "itinerary"
+      ]
+    },
+    {
+      "name": "Health",
+      "keywords": [
+        "mychart",
+        "after visit summary",
+        "health",
+        "doctor",
+        "appointment",
+        "medical",
+        "john muir"
+      ]
+    },
+    {
+      "name": "HOA and Home",
+      "keywords": [
+        "hoa",
+        "homeowner",
+        "board meeting",
+        "agenda",
+        "mailbox",
+        "security",
+        "adt",
+        "lowe's",
+        "home"
+      ]
+    },
+    {
+      "name": "Newsletters and News",
+      "keywords": [
+        "newsletter",
+        "breaking news",
+        "new york times",
+        "the morning",
+        "california today"
+      ]
+    },
+    {
+      "name": "Promotions",
+      "keywords": [
+        "offer",
+        "sale",
+        "discount",
+        "save",
+        "earn",
+        "points",
+        "rewards",
+        "upgrade",
+        "unsubscribe"
+      ]
+    },
+    {
+      "name": "Social and Jobs",
+      "keywords": [
+        "linkedin",
+        "facebook",
+        "notifications",
+        "job",
+        "role",
+        "recruiting",
+        "profile"
+      ]
+    }
+  ],
+  "fallback_category": "Uncategorized"
+}

@@ -83,6 +83,9 @@ if [[ -n "${CI:-}" && -n "${OPENAI_API_KEY:-}" ]]; then
     exit 1
   fi
   echo "OpenAI API key check passed."
+
+  printenv OPENAI_API_KEY | "$CODEX_BIN" login --with-api-key >/dev/null
+  echo "Codex API key login completed."
 fi
 
 mkdir -p "$LOG_DIR"

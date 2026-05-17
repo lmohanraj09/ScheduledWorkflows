@@ -2,9 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-TASK_FILE="$SCRIPT_DIR/categorize-last-24h-emails.codex.md"
+TASK_FILE="$SCRIPT_DIR/categorize-and-label-last-24h-emails.codex.md"
+CONFIG_FILE="$SCRIPT_DIR/email-categories.config.json"
 LOG_DIR="$SCRIPT_DIR/logs"
-LOG_FILE="$LOG_DIR/categorize-emails.log"
+LOG_FILE="$LOG_DIR/categorize-and-label-emails.log"
 SECRET_HELPER="$SCRIPT_DIR/scripts/fetch-gcp-secrets.py"
 
 CODEX_BIN="${CODEX_BIN:-$(command -v codex || true)}"
@@ -16,6 +17,11 @@ fi
 
 if [[ ! -f "$TASK_FILE" ]]; then
   echo "Task file not found: $TASK_FILE" >&2
+  exit 1
+fi
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "Config file not found: $CONFIG_FILE" >&2
   exit 1
 fi
 
@@ -70,12 +76,12 @@ fi
 mkdir -p "$LOG_DIR"
 
 {
-  echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') starting email categorization ====="
+  echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') starting email categorization and labeling ====="
   "$CODEX_BIN" exec \
     --skip-git-repo-check \
     --cd "$SCRIPT_DIR" \
     --sandbox workspace-write \
     -c approval_policy=\"never\" \
     - < "$TASK_FILE"
-  echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') finished email categorization ====="
+  echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') finished email categorization and labeling ====="
 } 2>&1 | tee -a "$LOG_FILE"

@@ -20,6 +20,29 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Show checked out commit
+        run: |
+          git status --short --branch
+          git rev-parse HEAD
+          git log -1 --oneline
+
+      - name: Validate GitHub configuration
+        env:
+          GCP_SERVICE_ACCOUNT_KEY_CORRECT: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_CORRECT }}
+        run: |
+          test -n "$GCP_SERVICE_ACCOUNT_KEY_CORRECT" || {
+            echo "Missing GitHub Actions secret: GCP_SERVICE_ACCOUNT_KEY_CORRECT" >&2
+            exit 1
+          }
+          test -n "$GCP_PROJECT_ID" || {
+            echo "Missing GitHub Actions variable or secret: GCP_PROJECT_ID" >&2
+            exit 1
+          }
+          test -n "$SECRET_MANAGER_ENV_MAP" || {
+            echo "Missing GitHub Actions variable or secret: SECRET_MANAGER_ENV_MAP" >&2
+            exit 1
+          }
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:

@@ -94,7 +94,7 @@ mkdir -p "$LOG_DIR"
     --cd "$SCRIPT_DIR" \
     --sandbox workspace-write \
     -c approval_policy=\"never\" \
-    -c preferred_auth_method=\"apikey\" \
+    -c forced_login_method=\"api\" \
     - < "$TASK_FILE"
   echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') finished email categorization and labeling ====="
 } 2>&1 | tee -a "$LOG_FILE"

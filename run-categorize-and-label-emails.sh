@@ -71,6 +71,18 @@ if [[ -n "${CI:-}" && -n "${OPENAI_API_KEY:-}" ]]; then
     sk-*) echo "OPENAI_API_KEY is present and has an OpenAI-looking prefix; length: ${#OPENAI_API_KEY}" ;;
     *) echo "OPENAI_API_KEY is present but does not start with sk-; length: ${#OPENAI_API_KEY}" >&2 ;;
   esac
+
+  openai_status="$(
+    curl -sS -o /tmp/emailassistant-openai-auth-check.json \
+      -w "%{http_code}" \
+      -H "Authorization: Bearer $OPENAI_API_KEY" \
+      https://api.openai.com/v1/models
+  )"
+  if [[ "$openai_status" != "200" ]]; then
+    echo "OpenAI API key check failed with HTTP $openai_status. The key was fetched from Secret Manager, but OpenAI rejected it." >&2
+    exit 1
+  fi
+  echo "OpenAI API key check passed."
 fi
 
 mkdir -p "$LOG_DIR"
@@ -82,6 +94,7 @@ mkdir -p "$LOG_DIR"
     --cd "$SCRIPT_DIR" \
     --sandbox workspace-write \
     -c approval_policy=\"never\" \
+    -c preferred_auth_method=\"apikey\" \
     - < "$TASK_FILE"
   echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') finished email categorization and labeling ====="
 } 2>&1 | tee -a "$LOG_FILE"

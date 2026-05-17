@@ -1,0 +1,35 @@
+name: Categorize and Label Emails
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  categorize-and-label:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+      SECRET_MANAGER_ENV_MAP: ${{ vars.SECRET_MANAGER_ENV_MAP || secrets.SECRET_MANAGER_ENV_MAP }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_CORRECT }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Run email categorization dry run
+        run: ./run-categorize-emails.sh

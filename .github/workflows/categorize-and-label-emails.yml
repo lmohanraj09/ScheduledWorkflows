@@ -54,5 +54,5 @@ jobs:
       - name: Install Codex CLI
         run: npm install -g @openai/codex
 
-      - name: Run email categorization dry run
-        run: ./run-categorize-emails.sh
+      - name: Run email categorization and labeling
+        run: ./run-categorize-and-label-emails.sh

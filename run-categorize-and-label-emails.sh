@@ -2,21 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-TASK_FILE="$SCRIPT_DIR/categorize-and-label-last-24h-emails.codex.md"
 CONFIG_FILE="$SCRIPT_DIR/email-categories.config.json"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/categorize-and-label-emails.log"
 SECRET_HELPER="$SCRIPT_DIR/scripts/fetch-gcp-secrets.py"
+GMAIL_AUTOMATION="$SCRIPT_DIR/scripts/categorize_and_label_gmail.py"
 
-CODEX_BIN="${CODEX_BIN:-$(command -v codex || true)}"
-
-if [[ -z "$CODEX_BIN" || ! -x "$CODEX_BIN" ]]; then
-  echo "codex CLI not found. Install Codex or set CODEX_BIN to the full codex path." >&2
-  exit 1
-fi
-
-if [[ ! -f "$TASK_FILE" ]]; then
-  echo "Task file not found: $TASK_FILE" >&2
+if [[ ! -f "$GMAIL_AUTOMATION" ]]; then
+  echo "Gmail automation script not found: $GMAIL_AUTOMATION" >&2
   exit 1
 fi
 
@@ -61,43 +54,17 @@ if [[ -n "${SECRET_MANAGER_ENV_MAP:-}" ]]; then
   source "$SECRET_MANAGER_SHELL_ENV_FILE"
 fi
 
-if [[ -n "${CI:-}" && -z "${OPENAI_API_KEY:-}" ]]; then
-  echo "OPENAI_API_KEY is missing. Add OPENAI_API_KEY=<gcp-secret-name> to SECRET_MANAGER_ENV_MAP and make sure that secret has a non-empty enabled version." >&2
-  exit 1
-fi
-
-if [[ -n "${CI:-}" && -n "${OPENAI_API_KEY:-}" ]]; then
-  case "$OPENAI_API_KEY" in
-    sk-*) echo "OPENAI_API_KEY is present and has an OpenAI-looking prefix; length: ${#OPENAI_API_KEY}" ;;
-    *) echo "OPENAI_API_KEY is present but does not start with sk-; length: ${#OPENAI_API_KEY}" >&2 ;;
-  esac
-
-  openai_status="$(
-    curl -sS -o /tmp/emailassistant-openai-auth-check.json \
-      -w "%{http_code}" \
-      -H "Authorization: Bearer $OPENAI_API_KEY" \
-      https://api.openai.com/v1/models
-  )"
-  if [[ "$openai_status" != "200" ]]; then
-    echo "OpenAI API key check failed with HTTP $openai_status. The key was fetched from Secret Manager, but OpenAI rejected it." >&2
+for required_var in GMAIL_CLIENT_ID GMAIL_CLIENT_SECRET GMAIL_REFRESH_TOKEN; do
+  if [[ -z "${!required_var:-}" ]]; then
+    echo "$required_var is missing. Add $required_var=<gcp-secret-name> to SECRET_MANAGER_ENV_MAP." >&2
     exit 1
   fi
-  echo "OpenAI API key check passed."
-
-  printenv OPENAI_API_KEY | "$CODEX_BIN" login --with-api-key >/dev/null
-  echo "Codex API key login completed."
-fi
+done
 
 mkdir -p "$LOG_DIR"
 
 {
   echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') starting email categorization and labeling ====="
-  "$CODEX_BIN" exec \
-    --skip-git-repo-check \
-    --cd "$SCRIPT_DIR" \
-    --sandbox workspace-write \
-    -c approval_policy=\"never\" \
-    -c forced_login_method=\"api\" \
-    - < "$TASK_FILE"
+  python3 "$GMAIL_AUTOMATION"
   echo "===== $(date '+%Y-%m-%d %H:%M:%S %Z') finished email categorization and labeling ====="
 } 2>&1 | tee -a "$LOG_FILE"

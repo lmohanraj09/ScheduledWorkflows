@@ -51,8 +51,5 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Install Codex CLI
-        run: npm install -g @openai/codex
-
       - name: Run email categorization and labeling
         run: ./run-categorize-and-label-emails.sh

@@ -378,6 +378,10 @@ def create_draft(token: str, to_email: str, subject: str, body: str) -> str:
     return response["id"]
 
 
+def has_category(messages: list[MessageInfo], category_name: str) -> bool:
+    return any(category_name in message.categories for message in messages)
+
+
 def main() -> int:
     script_dir = Path(__file__).resolve().parent.parent
     config = load_config(script_dir / "email-categories.config.json")
@@ -409,12 +413,15 @@ def main() -> int:
 
     digest = build_digest(messages, config, account_email, run_time)
     subject = f"Email Summary for you - {run_time.strftime('%Y-%m-%d %H:%M %Z')}"
-    draft_id = create_draft(token, account_email, subject, digest)
 
     print(digest)
-    print(f"Created exactly one Gmail draft with the full grouped digest.")
-    print(f"Draft ID: {draft_id}")
-    print(f"Subject: {subject}")
+    if has_category(messages, "Finance"):
+        draft_id = create_draft(token, account_email, subject, digest)
+        print(f"Created exactly one Gmail draft with the full grouped digest.")
+        print(f"Draft ID: {draft_id}")
+        print(f"Subject: {subject}")
+    else:
+        print("Skipped Gmail draft creation because no Finance emails matched.")
     return 0
 
 

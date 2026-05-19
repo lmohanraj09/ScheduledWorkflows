@@ -19,12 +19,13 @@ Use the Gmail connector to summarize email received within the configured lookba
    - A message can appear in multiple categories if it matches multiple category keyword sets.
    - If no category matches, use `fallback_category`.
 7. Produce a concise digest grouped by category.
-8. Create a Gmail draft containing the same digest.
+8. If at least one remaining email has the `Finance` category, create a Gmail draft containing the same digest.
    - Address the draft to the authenticated Gmail account unless the user specifies a different recipient.
    - Use this subject format: `Email Summary for you - <YYYY-MM-DD HH:mm z>`
    - Use the run date and time in the user's local timezone for the subject timestamp.
    - Put the full digest in the draft body.
    - After creating the draft, report the draft ID and subject.
+   - If no remaining email has the `Finance` category, do not create a draft and report that draft creation was skipped because no Finance emails matched.
 
 ## Output Format
 
@@ -49,7 +50,8 @@ Category Name
 ## Important Rules
 
 - Do not send emails.
-- Create exactly one Gmail draft for the digest as part of this task.
+- Create exactly one Gmail draft for the digest only when at least one email has the `Finance` category.
+- Do not create a Gmail draft when no email has the `Finance` category.
 - Do not create any other drafts unless explicitly asked after the digest is shown.
 - Do not include long quoted email bodies.
 - For financial, medical, tax, or security emails, summarize minimally and recommend reviewing the official portal directly.

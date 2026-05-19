@@ -331,6 +331,10 @@ def build_count_summary(messages: list[MessageInfo], config: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def summary_subject_for(run_time: datetime) -> str:
+    return f"Email Category Summary - {run_time.strftime('%Y-%m-%d %H:%M %Z')}"
+
+
 def finance_messages(messages: list[MessageInfo]) -> list[MessageInfo]:
     return [message for message in messages if "Finance" in message.categories]
 
@@ -405,7 +409,15 @@ def main() -> int:
     for message in messages:
         apply_labels(token, message, label_ids)
 
-    print(build_count_summary(messages, config))
+    count_summary = build_count_summary(messages, config)
+    print(count_summary)
+
+    summary_subject = summary_subject_for(run_time)
+    summary_draft_id = create_draft(token, account_email, summary_subject, count_summary)
+    print("Created one Gmail draft with the category count summary.")
+    print(f"Summary Draft ID: {summary_draft_id}")
+    print(f"Summary Subject: {summary_subject}")
+
     finance_items = finance_messages(messages)
     if finance_items:
         print(f"Created {len(finance_items)} individual Gmail draft(s) for Finance emails.")

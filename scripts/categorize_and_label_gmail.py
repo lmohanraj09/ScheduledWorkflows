@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Categorize recent Gmail messages, apply labels, and create a digest draft."""
+"""Categorize recent Gmail messages, apply labels, and create Finance drafts."""
 
 from __future__ import annotations
 
@@ -314,7 +314,7 @@ def one_sentence_summary(message: MessageInfo) -> str:
     return source
 
 
-def build_digest(messages: list[MessageInfo], config: dict, account_email: str, run_time: datetime) -> str:
+def build_count_summary(messages: list[MessageInfo], config: dict) -> str:
     grouped: dict[str, list[MessageInfo]] = defaultdict(list)
     for message in messages:
         for category in message.categories:
@@ -325,41 +325,39 @@ def build_digest(messages: list[MessageInfo], config: dict, account_email: str, 
     if fallback not in category_names:
         category_names.append(fallback)
 
-    lines = [
-        f"Email Summary for {account_email}",
-        f"Run time: {run_time.strftime('%Y-%m-%d %H:%M %Z')}",
-        "",
-        f"- Total received emails scanned: {len(messages)}",
-    ]
+    lines = []
     for category in category_names:
         lines.append(f"- {category}: {len(grouped.get(category, []))}")
-    lines.append(f"- Number of uncategorized emails: {len(grouped.get(fallback, []))}")
-    lines.append(f"- Number of emails labeled: {len(messages)}")
-    lines.append("")
-
-    for category in category_names:
-        items = grouped.get(category, [])
-        if not items:
-            continue
-        lines.append(category)
-        for message in items:
-            keywords = message.matched_keywords.get(category, [])
-            why = ", ".join(keywords) if keywords else "fallback category"
-            labels = ", ".join(message.categories)
-            lines.extend(
-                [
-                    f"- Sender: {message.sender}",
-                    f"  Subject: {message.subject}",
-                    f"  Time: {message.email_ts.strftime('%Y-%m-%d %H:%M %Z')}",
-                    f"  Labels applied: {labels}",
-                    f"  Why matched: {why}",
-                    f"  Summary: {one_sentence_summary(message)}",
-                    f"  Suggested next step: {next_step_for(message.categories)}",
-                ]
-            )
-        lines.append("")
-
     return "\n".join(lines).rstrip() + "\n"
+
+
+def finance_messages(messages: list[MessageInfo]) -> list[MessageInfo]:
+    return [message for message in messages if "Finance" in message.categories]
+
+
+def draft_subject_for(message: MessageInfo) -> str:
+    subject = re.sub(r"\s+", " ", message.subject).strip() or "(no subject)"
+    return f"Finance email review - {subject}"
+
+
+def build_finance_draft_body(message: MessageInfo) -> str:
+    keywords = message.matched_keywords.get("Finance", [])
+    why = ", ".join(keywords) if keywords else "Finance category match"
+    labels = ", ".join(message.categories)
+    return "\n".join(
+        [
+            "Finance email review",
+            "",
+            f"Sender: {message.sender}",
+            f"Subject: {message.subject}",
+            f"Time: {message.email_ts.strftime('%Y-%m-%d %H:%M %Z')}",
+            f"Labels applied: {labels}",
+            f"Finance keywords: {why}",
+            f"Summary: {one_sentence_summary(message)}",
+            "Suggested next step: review official portal directly",
+            "",
+        ]
+    )
 
 
 def create_draft(token: str, to_email: str, subject: str, body: str) -> str:
@@ -376,10 +374,6 @@ def create_draft(token: str, to_email: str, subject: str, body: str) -> str:
         data={"message": {"raw": raw}},
     )
     return response["id"]
-
-
-def has_category(messages: list[MessageInfo], category_name: str) -> bool:
-    return any(category_name in message.categories for message in messages)
 
 
 def main() -> int:
@@ -411,15 +405,16 @@ def main() -> int:
     for message in messages:
         apply_labels(token, message, label_ids)
 
-    digest = build_digest(messages, config, account_email, run_time)
-    subject = f"Email Summary for you - {run_time.strftime('%Y-%m-%d %H:%M %Z')}"
-
-    print(digest)
-    if has_category(messages, "Finance"):
-        draft_id = create_draft(token, account_email, subject, digest)
-        print(f"Created exactly one Gmail draft with the full grouped digest.")
-        print(f"Draft ID: {draft_id}")
-        print(f"Subject: {subject}")
+    print(build_count_summary(messages, config))
+    finance_items = finance_messages(messages)
+    if finance_items:
+        print(f"Created {len(finance_items)} individual Gmail draft(s) for Finance emails.")
+        for message in finance_items:
+            subject = draft_subject_for(message)
+            body = build_finance_draft_body(message)
+            draft_id = create_draft(token, account_email, subject, body)
+            print(f"Draft ID: {draft_id}")
+            print(f"Subject: {subject}")
     else:
         print("Skipped Gmail draft creation because no Finance emails matched.")
     return 0

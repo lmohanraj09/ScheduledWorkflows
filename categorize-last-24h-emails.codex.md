@@ -18,41 +18,30 @@ Use the Gmail connector to summarize email received within the configured lookba
    - Matching is case-insensitive.
    - A message can appear in multiple categories if it matches multiple category keyword sets.
    - If no category matches, use `fallback_category`.
-7. Produce a concise digest grouped by category.
-8. If at least one remaining email has the `Finance` category, create a Gmail draft containing the same digest.
+7. Produce a concise count summary grouped by category.
+   - Include only category names and counts.
+   - Do not list individual email details in the run output.
+8. For each remaining email that has the `Finance` category, create one individual Gmail draft for that email.
    - Address the draft to the authenticated Gmail account unless the user specifies a different recipient.
-   - Use this subject format: `Email Summary for you - <YYYY-MM-DD HH:mm z>`
-   - Use the run date and time in the user's local timezone for the subject timestamp.
-   - Put the full digest in the draft body.
-   - After creating the draft, report the draft ID and subject.
+   - Use this subject format: `Finance email review - <original email subject>`
+   - Put only that Finance email's sender, subject, received time, matched Finance keywords, a minimal one-sentence summary, and suggested next step in the draft body.
+   - For the suggested next step, recommend reviewing the official portal directly.
+   - After creating drafts, report each draft ID and subject.
    - If no remaining email has the `Finance` category, do not create a draft and report that draft creation was skipped because no Finance emails matched.
 
 ## Output Format
 
-Start with a short count summary:
+Output only a short count summary:
 
-- Total received emails scanned
-- Number of emails in each category
-- Number of uncategorized emails
-
-Then list categorized emails like this:
-
-```text
-Category Name
-- Sender: <from>
-  Subject: <subject>
-  Time: <email_ts>
-  Why matched: <matched keywords>
-  Summary: <one sentence summary>
-  Suggested next step: <reply/review/file/archive/ignore>
-```
+- <Category Name>: <count>
 
 ## Important Rules
 
 - Do not send emails.
-- Create exactly one Gmail draft for the digest only when at least one email has the `Finance` category.
+- Create one individual Gmail draft for each email that has the `Finance` category.
 - Do not create a Gmail draft when no email has the `Finance` category.
-- Do not create any other drafts unless explicitly asked after the digest is shown.
+- Do not create grouped summary drafts.
+- Do not create drafts for non-Finance emails unless explicitly asked after the summary is shown.
 - Do not include long quoted email bodies.
 - For financial, medical, tax, or security emails, summarize minimally and recommend reviewing the official portal directly.
 - Prefer practical categories over perfect classification.

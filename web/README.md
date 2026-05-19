@@ -45,6 +45,14 @@ After deployment, copy the Cloud Run service URL and add this redirect URI to th
 https://YOUR-CLOUD-RUN-URL/auth/google/callback
 ```
 
+Then pin the callback URL in Cloud Run so Google OAuth always receives the exact registered URI:
+
+```bash
+gcloud run services update emailassistant-web \
+  --region us-west1 \
+  --set-env-vars OAUTH_REDIRECT_URI=https://YOUR-CLOUD-RUN-URL/auth/google/callback
+```
+
 Then open the Cloud Run URL and click **Connect Gmail**.
 
 ## Stored Data

@@ -11,6 +11,7 @@ from flask import Flask, abort, redirect, request, session, url_for
 from google.api_core.exceptions import AlreadyExists, NotFound
 from google.cloud import firestore
 from google.cloud import secretmanager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -21,6 +22,7 @@ GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 
 def require_env(name: str) -> str:

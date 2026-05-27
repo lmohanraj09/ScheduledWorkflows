@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/categorize_and_label_gmail.py ./scripts/categorize_and_label_gmail.py
+
+CMD ["python3", "scripts/categorize_and_label_gmail.py"]

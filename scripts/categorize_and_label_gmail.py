@@ -23,6 +23,10 @@ from zoneinfo import ZoneInfo
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 LOCAL_TZ = os.environ.get("EMAILASSISTANT_TZ", "America/Los_Angeles")
+FIRESTORE_API = "https://firestore.googleapis.com/v1"
+METADATA_TOKEN_URL = (
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+)
 
 
 @dataclass
@@ -48,6 +52,10 @@ def require_env(name: str) -> str:
     if not value:
         die(f"{name} must be set.")
     return value
+
+
+def optional_env(name: str) -> str:
+    return os.environ.get(name, "").strip()
 
 
 def http_json(
@@ -78,6 +86,41 @@ def http_json(
     if not raw:
         return {}
     return json.loads(raw.decode("utf-8"))
+
+
+def metadata_access_token() -> str | None:
+    request = urllib.request.Request(
+        METADATA_TOKEN_URL,
+        headers={"Metadata-Flavor": "Google"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            token_response = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+        return None
+    return token_response.get("access_token")
+
+
+def gcloud_access_token() -> str | None:
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["gcloud", "auth", "print-access-token"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+    token = result.stdout.strip()
+    return token or None
+
+
+def google_access_token() -> str | None:
+    return metadata_access_token() or gcloud_access_token()
 
 
 def form_json(url: str, values: dict[str, str]) -> dict:
@@ -122,19 +165,14 @@ def get_access_token() -> str:
     return access_token
 
 
-def load_config(path: Path) -> dict:
-    try:
-        config = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        die(f"Invalid JSON in {path}: line {exc.lineno}, column {exc.colno}: {exc.msg}")
-
+def validate_config(config: dict, source: str) -> dict:
     lookback = config.get("lookback_hours", 24)
     if not isinstance(lookback, (int, float)) or lookback <= 0:
-        die("email-categories.config.json field lookback_hours must be a positive number.")
+        die(f"{source} field lookback_hours must be a positive number.")
 
     categories = config.get("categories")
     if not isinstance(categories, list) or not categories:
-        die("email-categories.config.json field categories must be a non-empty list.")
+        die(f"{source} field categories must be a non-empty list.")
 
     for category in categories:
         if not isinstance(category.get("name"), str) or not category["name"].strip():
@@ -143,6 +181,109 @@ def load_config(path: Path) -> dict:
             die(f"Category {category.get('name')!r} must have a keywords list.")
 
     return config
+
+
+def firestore_value_to_python(value: dict) -> object:
+    if "nullValue" in value:
+        return None
+    if "booleanValue" in value:
+        return value["booleanValue"]
+    if "integerValue" in value:
+        return int(value["integerValue"])
+    if "doubleValue" in value:
+        return float(value["doubleValue"])
+    if "stringValue" in value:
+        return value["stringValue"]
+    if "timestampValue" in value:
+        return value["timestampValue"]
+    if "arrayValue" in value:
+        return [
+            firestore_value_to_python(item)
+            for item in value.get("arrayValue", {}).get("values", [])
+        ]
+    if "mapValue" in value:
+        return {
+            key: firestore_value_to_python(item)
+            for key, item in value.get("mapValue", {}).get("fields", {}).items()
+        }
+    return None
+
+
+def firestore_document_to_dict(document: dict) -> dict:
+    return {
+        key: firestore_value_to_python(value)
+        for key, value in document.get("fields", {}).items()
+    }
+
+
+def firestore_config_document_url(project_id: str, client_slug: str) -> str:
+    path = f"/projects/{project_id}/databases/(default)/documents/email_assistant_configs/{client_slug}"
+    return f"{FIRESTORE_API}{path}"
+
+
+def curl_json(url: str, token: str) -> dict | None:
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            [
+                "curl",
+                "-fsS",
+                "-H",
+                f"Authorization: Bearer {token}",
+                "-H",
+                "Accept: application/json",
+                url,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+    return json.loads(result.stdout)
+
+
+def fetch_firestore_document(url: str, token: str) -> dict | None:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        detail = exc.read().decode("utf-8", errors="replace")
+        print(f"Firestore config request failed with HTTP {exc.code}: {detail}", file=sys.stderr)
+    except urllib.error.URLError as exc:
+        print(f"Firestore config request failed: {exc}", file=sys.stderr)
+
+    return curl_json(url, token)
+
+
+def load_config_from_firestore() -> dict:
+    project_id = require_env("GCP_PROJECT_ID")
+    client_slug = optional_env("CLIENT_SLUG") or "mohanmain"
+
+    token = google_access_token()
+    if not token:
+        die("Could not get Google access token for Firestore config.")
+
+    url = firestore_config_document_url(project_id, client_slug)
+    document = fetch_firestore_document(url, token)
+    if not document:
+        die(f"Could not read Firestore config email_assistant_configs/{client_slug}.")
+
+    config = firestore_document_to_dict(document)
+    print(f"Loaded config from Firestore: email_assistant_configs/{client_slug}", file=sys.stderr)
+    return validate_config(config, f"Firestore email_assistant_configs/{client_slug}")
 
 
 def list_message_ids(token: str, query: str) -> list[str]:
@@ -381,8 +522,7 @@ def create_draft(token: str, to_email: str, subject: str, body: str) -> str:
 
 
 def main() -> int:
-    script_dir = Path(__file__).resolve().parent.parent
-    config = load_config(script_dir / "email-categories.config.json")
+    config = load_config_from_firestore()
     tz = ZoneInfo(LOCAL_TZ)
     run_time = datetime.now(tz)
     cutoff = run_time - timedelta(hours=float(config["lookback_hours"]))
